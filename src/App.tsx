@@ -1,75 +1,78 @@
-// Import React useState hook
-import { useState } from "react";
-
-// Import child components
-import ExpenseList from "./expense-tracker/components/ExpenseList";
-import ExpenseFilter from "./expense-tracker/components/ExpenseFilter";
-import ExpenseForm from "./expense-tracker/components/ExpenseForm";
-
+import type { User } from "./services/user-service";
+import userService from "./services/user-service";
+import useUsers from "./hooks/useUsers";
 function App() {
-  // State for currently selected category in the filter
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const { users, error, isLoading, setUsers, setError } = useUsers();
 
-  // State for all expenses
-  const [expenses, setExpenses] = useState([
-    { id: 1, description: "Cereals", amount: 100, categories: "Groceries" },
-    { id: 2, description: "Rent", amount: 120.567, categories: "Housing" },
-    { id: 3, description: "Gym Membership", amount: 50, categories: "Health" },
-    { id: 4, description: "Power", amount: 75.25, categories: "Utilities" },
-    {
-      id: 5,
-      description: "Vegetables",
-      amount: 40.75,
-      categories: "Groceries",
-    },
-    {
-      id: 6,
-      description: "Internet Bill",
-      amount: 60,
-      categories: "Utilities",
-    },
-  ]); // Placeholder data for expenses
+  const deleteUser = (user: User) => {
+    const originalUsers = [...users];
+    setUsers(users.filter((u) => u.id !== user.id));
+    userService.deleteUser(user.id).catch((err) => {
+      setError(err.message);
+      setUsers(originalUsers);
+    });
+  };
+  const addUser = () => {
+    const newUser = { id: 0, name: "Rhino" };
+    if (users.some((u) => u.id === newUser.id)) {
+      setError("User with this ID already exists");
+      return;
+    }
+    const originalUsers = [...users];
+    setUsers([newUser, ...users]);
 
-  // Filter expenses based on selected category
-  const visibleExpenses = selectedCategory
-    ? expenses.filter((expense) => expense.categories === selectedCategory)
-    : expenses;
+    userService
+      .create(newUser)
+      .then(({ data: savedUser }) => setUsers([savedUser, ...users]))
+      .catch((err) => {
+        setError(err.message);
+        setUsers(originalUsers);
+      });
+  };
 
-  // Delete expense by id
-  const handleDelete = (id: number) => {
-    setExpenses(expenses.filter((expense) => expense.id !== id));
+  const updateUser = (user: User) => {
+    if (user.name.endsWith("!")) return;
+    const originalUsers = [...users];
+    const updatedUser = { ...user, name: user.name + "!" };
+    setUsers(users.map((u) => (u.id === user.id ? updatedUser : u)));
+    userService.update(user).catch((err) => {
+      setError(err.message);
+      setUsers(originalUsers);
+    });
   };
 
   return (
-    <div>
-      {/* Expense input form */}
-      <div className="mb-5">
-        <ExpenseForm
-          onSubmit={(expense) =>
-            setExpenses([
-              ...expenses,
-              {
-                id: expenses.length + 1,
-                description: expense.description,
-                amount: expense.amount,
-                categories: expense.category,
-              },
-            ])
-          }
-        />
-      </div>
-
-      {/* Category filter dropdown */}
-      <div className="mb-3">
-        <ExpenseFilter
-          setCategory={selectedCategory} // Current selected category
-          onSelectCategory={(category) => setSelectedCategory(category)} // Update selected category
-        />
-      </div>
-
-      {/* List of expenses */}
-      <ExpenseList expenses={visibleExpenses} onDelete={handleDelete} />
-    </div>
+    <>
+      {error && <p className="text-danger">{error}</p>}
+      {isLoading && <div className="spinner-border"></div>}
+      <button className="btn btn-primary mb-3" onClick={addUser}>
+        Add
+      </button>
+      <ul className="list-group">
+        {users.map((user) => (
+          <li
+            key={user.id}
+            className="list-group-item d-flex justify-content-between"
+          >
+            {user.name}
+            <div>
+              <button
+                className="btn btn-outline-secondary mx-2"
+                onClick={() => updateUser(user)}
+              >
+                Update
+              </button>
+              <button
+                className="btn-outline-danger"
+                onClick={() => deleteUser(user)}
+              >
+                Delete
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
